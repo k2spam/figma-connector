@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "figma-connector": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"],
+      "env": {
+        "FIGMA_TOKEN": "${FIGMA_TOKEN}",
+        "FIGMA_ASSET_DIR": "${FIGMA_ASSET_DIR}",
+        "FIGMA_CACHE_DIR": "${FIGMA_CACHE_DIR}"
+      }
+    }
+  }
+}
