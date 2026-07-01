@@ -1,8 +1,10 @@
-// Thin wrapper around the Figma REST API. Zero dependencies (Node 18+ global fetch).
+// Thin wrapper around the Figma REST API. Zero dependencies — uses a small
+// https-based HTTP helper so no global fetch is required.
 
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const httpc = require("./http");
 
 const BASE = "https://api.figma.com/v1";
 
@@ -78,13 +80,13 @@ function normalizeNodeId(id) {
   return String(id).replace(/-/g, ":");
 }
 
-async function call(path, { raw = false } = {}) {
+async function call(path) {
   const url = `${BASE}${path}`;
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
     let res;
     try {
-      res = await fetch(url, { headers: { "X-Figma-Token": token() } });
+      res = await httpc.getJson(url, { headers: { "X-Figma-Token": token() } });
     } catch (e) {
       lastErr = e;
       await sleep(400 * (attempt + 1));
@@ -96,10 +98,9 @@ async function call(path, { raw = false } = {}) {
       continue;
     }
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Figma API ${res.status} on ${path}: ${body.slice(0, 300)}`);
+      throw new Error(`Figma API ${res.status} on ${path}: ${(res.text || "").slice(0, 300)}`);
     }
-    return raw ? res : res.json();
+    return res.json;
   }
   throw lastErr || new Error(`Figma API request failed: ${path}`);
 }

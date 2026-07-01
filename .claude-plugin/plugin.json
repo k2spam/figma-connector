@@ -1,6 +1,6 @@
 {
   "name": "figma-connector",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pulls clean, code-ready data and assets from Figma designs straight into Claude. Normalizes styles, variables/tokens, layout, components and exports icons/images.",
   "author": {
     "name": "Vladimir Khlebnikov"

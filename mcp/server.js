@@ -9,7 +9,13 @@ const norm = require("./normalize");
 const cache = require("./cache");
 const assets = require("./assets");
 
-const SERVER = { name: "figma-connector", version: "0.1.0" };
+let VERSION = "0.0.0";
+try {
+  VERSION = require("../.claude-plugin/plugin.json").version || VERSION;
+} catch (_) {
+  /* keep fallback */
+}
+const SERVER = { name: "figma-connector", version: VERSION };
 const PROTOCOL = "2024-11-05";
 
 // ---------- helpers ----------

@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const api = require("./figma-api");
+const httpc = require("./http");
 
 function assetRoot(override) {
   if (override) return override;
@@ -22,11 +23,10 @@ function sanitize(name, fallback) {
 }
 
 async function download(url, dest) {
-  const res = await fetch(url);
+  const res = await httpc.get(url);
   if (!res.ok) throw new Error(`Download failed ${res.status} for ${url}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  fs.writeFileSync(dest, buf);
-  return buf.length;
+  fs.writeFileSync(dest, res.buffer);
+  return res.buffer.length;
 }
 
 // nodes: array of { id, name }. Renders each to `format` and writes files.
