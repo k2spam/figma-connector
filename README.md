@@ -10,8 +10,8 @@ The official Figma MCP and raw REST API return data that is either too shallow o
 
 ## What's inside
 
-- **MCP server** (`mcp/server.js`) — zero dependencies, runs on Node 18+ (uses the built-in `fetch`).
-- **Skill** (`skills/figma-to-code`) — teaches Claude a tokens → layout → assets workflow.
+- **MCP server** (`plugins/figma-connector/mcp/server.js`) — zero dependencies, uses the built-in `https` module (any Node version).
+- **Skill** (`plugins/figma-connector/skills/figma-to-code`) — teaches Claude a tokens → layout → assets workflow.
 
 ### Tools
 
@@ -97,7 +97,7 @@ Designs change. The cache tracks each file's `lastModified`.
 printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  | node mcp/server.js
+  | node plugins/figma-connector/mcp/server.js
 ```
 
 ### Releasing

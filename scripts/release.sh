@@ -3,20 +3,20 @@
 #
 # Usage:
 #   ./scripts/release.sh            # keep current version, just re-stamp + rebuild
-#   ./scripts/release.sh patch      # 0.1.3 -> 0.1.4
-#   ./scripts/release.sh minor      # 0.1.3 -> 0.2.0
-#   ./scripts/release.sh major      # 0.1.3 -> 1.0.0
+#   ./scripts/release.sh patch      # 0.1.4 -> 0.1.5
+#   ./scripts/release.sh minor      # 0.1.4 -> 0.2.0
+#   ./scripts/release.sh major      # 0.1.4 -> 1.0.0
 #   ./scripts/release.sh 1.2.3      # set an explicit version
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PLUGIN_JSON=".claude-plugin/plugin.json"
+PLUGIN_DIR="plugins/figma-connector"
+PLUGIN_JSON="$PLUGIN_DIR/.claude-plugin/plugin.json"
 MARKET_JSON=".claude-plugin/marketplace.json"
 BUMP="${1:-}"
 
-# 1. Resolve the new version (in Node, so no jq dependency) and write it to plugin.json.
 VERSION="$(node -e '
   const fs = require("fs");
   const f = process.argv[1];
@@ -33,7 +33,6 @@ VERSION="$(node -e '
   process.stdout.write(j.version);
 ' "$PLUGIN_JSON" "$BUMP")"
 
-# 2. Stamp the same version into the marketplace plugin entry.
 node -e '
   const fs = require("fs");
   const f = process.argv[1];
@@ -43,19 +42,17 @@ node -e '
   fs.writeFileSync(f, JSON.stringify(m, null, 2) + "\n");
 ' "$MARKET_JSON" "$VERSION"
 
-# 3. Rebuild the .plugin bundle (only runtime files; no docs/build/git).
 NAME="figma-connector-$VERSION.plugin"
 TMP="$(mktemp -d)"
-zip -r -q "$TMP/$NAME" . \
-  -x "*.DS_Store" "docs/*" "build/*" ".git/*" "*/node_modules/*" "*.plugin" "scripts/*"
+( cd "$PLUGIN_DIR" && zip -r -q "$TMP/$NAME" . -x "*.DS_Store" "*/node_modules/*" )
 mkdir -p build
 rm -f build/*.plugin
 cp "$TMP/$NAME" "build/$NAME"
 rm -rf "$TMP"
 
 echo "Released version $VERSION"
-echo "  - $PLUGIN_JSON      -> $VERSION"
-echo "  - $MARKET_JSON      -> $VERSION"
+echo "  - $PLUGIN_JSON  -> $VERSION"
+echo "  - $MARKET_JSON  -> $VERSION"
 echo "  - build/$NAME"
 echo
-echo "Next: commit & push, then Sync the marketplace and click Update in Claude."
+echo "Next: commit & push, then re-add / Sync the marketplace and click Update in Claude."
