@@ -1,0 +1,13 @@
+{
+  "name": "figma-connector",
+  "owner": {
+    "name": "Vladimir Khlebnikov"
+  },
+  "plugins": [
+    {
+      "name": "figma-connector",
+      "source": "./",
+      "description": "Pulls clean, code-ready data and assets from Figma designs straight into Claude. Normalizes styles, variables/tokens, layout, components and exports icons/images."
+    }
+  ]
+}
