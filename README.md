@@ -100,4 +100,14 @@ printf '%s\n' \
   | node mcp/server.js
 ```
 
+### Releasing
+
+Use the release script — it bumps the version, keeps `plugin.json` and `marketplace.json` in sync (the marketplace manifest **must** change for the app to detect an update), and rebuilds `build/figma-connector-<version>.plugin`:
+
+```bash
+./scripts/release.sh patch   # or: minor | major | 1.2.3 | (no arg = re-stamp current)
+```
+
+Then commit & push. In the app, **Sync** the marketplace and click **Update**.
+
 License: MIT.
