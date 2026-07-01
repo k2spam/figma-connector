@@ -17,37 +17,38 @@ The official Figma MCP and raw REST API return data that is either too shallow o
 
 | Tool | Purpose |
 |------|---------|
-| `figma_get_file` | Whole file as normalized JSON (layout, fills, typography, effects, components, tokens). Cached. |
-| `figma_get_node` | Specific frames/nodes — cheap, for iterating screen-by-screen. |
+| `figma_get_file` | Pull the whole file once, cache it locally, return tokens + a compact skeleton (not the full tree). |
+| `figma_outline` | Skeleton (id/name/type/tag/size) of the file or a node, from the local cache — for navigation. |
+| `figma_get_node` | Read node(s) in full detail from the local cache; the file is pulled once automatically if needed. |
 | `figma_list_tokens` | Just the design tokens (variables + styles). |
 | `figma_export_assets` | Render & download icons/images (SVG/PNG/JPG/PDF) into the project. |
 | `figma_check_updates` | Detect whether the design changed since the last pull. |
 
+The model is **pull once, then browse locally**: `figma_get_file` fetches everything and caches it, and `figma_outline` / `figma_get_node` read from that cache with no further API calls until you `refresh`.
+
 ## Installation
 
-Install the `.plugin` file (from `build/`) as a local plugin in the Claude desktop app:
+The recommended way is to add this repository as a plugin **marketplace** — you get one‑click install plus future updates via **Sync**.
 
-1. Open the **Cowork** menu → **Customize**.
+1. In the Claude desktop app open **Customize → Plugins**, click the **+** next to Local uploads and choose **Add marketplace**.
 
-   ![Cowork menu → Customize](docs/images/install-1-customize.png)
+   ![Local uploads → + → Add marketplace](docs/images/install-4-upload-menu.png)
 
-2. On the Customize screen, choose **Browse plugins**.
+2. In the **URL** field enter the repository — `k2spam/figma-connector` (GitHub `owner/repo`) or the full `https://github.com/k2spam/figma-connector`. Point it at the **repo root**, not a subfolder like `/tree/main/build`.
 
-   ![Customize → Browse plugins](docs/images/install-2-browse-plugins.png)
+   ![Add marketplace — enter the repository](docs/images/marketplace-1-enter-url.png)
 
-3. In the Directory, open **Plugins**, select the **Personal** tab → **Local uploads**.
+3. Choose **Use "…"** for the URL you typed, then click **Sync**. The marketplace loads and you can install the **figma-connector** plugin from it.
 
-   ![Plugins → Personal → Local uploads](docs/images/install-3-personal-uploads.png)
+   ![Add marketplace — confirm the repository](docs/images/marketplace-2-use-url.png)
 
-4. Click the **+** next to Local uploads and choose **Upload plugin**.
+To update later, re-open the marketplace and click **Sync** — it pulls the latest code from `main`.
 
-   ![Upload plugin menu](docs/images/install-4-upload-menu.png)
+### Alternative: install a local build
 
-5. Drag the `.plugin` file into the dialog (or **Browse files**) and click **Upload**.
+Prefer not to use GitHub? Upload the `.plugin` from `build/` directly: **Customize → Plugins → Personal → Local uploads → + → Upload plugin**, then drag the file in and click **Upload**.
 
-   ![Upload local plugin dialog](docs/images/install-5-upload-dialog.png)
-
-Then set your token (below) and you're ready.
+Either way, set your token (below) and you're ready.
 
 ## Setup
 

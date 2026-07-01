@@ -1,10 +1,7 @@
 # Screenshots
 
-Install-flow screenshots referenced from the top-level README. Drop the files
-here with these exact names:
+Referenced from the top-level README (Installation). Drop files here with these exact names:
 
-- `install-1-customize.png`     — Cowork menu → Customize
-- `install-2-browse-plugins.png`— Customize screen → Browse plugins
-- `install-3-personal-uploads.png` — Directory → Plugins → Personal → Local uploads
-- `install-4-upload-menu.png`   — the "+" menu → Upload plugin
-- `install-5-upload-dialog.png` — Upload local plugin dialog (drag & drop the .plugin)
+- `install-4-upload-menu.png`     — Local uploads → "+" menu (Add marketplace / Upload plugin)
+- `marketplace-1-enter-url.png`   — Add marketplace dialog, entering owner/repo or the git URL
+- `marketplace-2-use-url.png`     — the "Use \"…\"" option / repository selected, before Sync

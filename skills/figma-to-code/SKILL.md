@@ -11,9 +11,11 @@ Build front-end code from Figma designs using the `figma-connector` MCP tools. T
 
 Work tokens-first, then layout, then assets. This order produces clean, themeable code instead of hard-coded magic values.
 
-1. **Tokens first.** Call `figma_list_tokens` for the file. Map the result to CSS custom properties (or the project's theme system) before writing any component. Use `tokens.variables` when present; fall back to `tokens.styles`. If `tokens._variablesNote` says variables were unavailable, that is expected on non-Enterprise plans — use the style tokens.
+0. **Pull once.** Call `figma_get_file` first. It caches the whole normalized file locally and returns a compact response: `file`, `tokens`, and a shallow `outline` (skeleton) — not the full tree. All later reads hit that local cache, so this is the only call that touches the Figma API (until the design changes).
 
-2. **Structure next.** For a whole screen, call `figma_get_file`. For a single frame or while iterating, call `figma_get_node` with the node id (a `node-id` copied from a Figma URL works directly). Build the DOM from the `document`/`nodes` tree.
+1. **Tokens first.** Use the `tokens` from the `figma_get_file` response (or call `figma_list_tokens`). Map them to CSS custom properties before writing any component. Use `tokens.variables` when present; fall back to `tokens.styles`. A `_variablesNote` means variables are unavailable (non-Enterprise) — use style tokens.
+
+2. **Navigate, then read in full.** Use the `outline` (or `figma_outline` for a deeper skeleton) to find the node ids you need, then call `figma_get_node` with those ids to get full detail from the local cache. Pass `depth` to keep a subtree bounded. A `node-id` copied from a Figma URL works directly. These reads make no API calls.
 
 3. **Assets last.** Call `figma_export_assets` to download icons/images into the project. Reference the saved file paths it returns. Never inline-trace an icon by hand when the connector can export the real SVG.
 

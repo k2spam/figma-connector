@@ -80,62 +80,106 @@ async function buildFileBundle(ref, { depth, refresh, include } = {}) {
   return bundle;
 }
 
+// Load the cached full bundle for a file, pulling & caching it once if missing.
+async function ensureBundle(fileRef, { refresh } = {}) {
+  const { fileKey } = api.parseFileRef(fileRef);
+  let bundle = refresh ? null : cache.readJson(fileKey, "bundle.json");
+  if (!bundle) {
+    bundle = await buildFileBundle(fileRef, { include: ["document", "tokens"], refresh });
+  }
+  return { fileKey, bundle };
+}
+
+function findNodeById(nodes, id) {
+  for (const n of nodes || []) {
+    if (n.id === id) return n;
+    const hit = findNodeById(n.children, id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+// Full detail, but children pruned beyond maxDepth (replaced with a count).
+function pruneDepth(node, maxDepth, depth = 0) {
+  const copy = { ...node };
+  if (node.children && node.children.length) {
+    if (depth >= maxDepth) {
+      copy.children = undefined;
+      copy.childrenCount = node.children.length;
+    } else {
+      copy.children = node.children.map((c) => pruneDepth(c, maxDepth, depth + 1));
+    }
+  }
+  return copy;
+}
+
+// Skeleton only: id / name / type / tag / size + nested outline (or child count).
+function toOutline(node, maxDepth, depth = 0) {
+  const o = { id: node.id, name: node.name, type: node.type, tag: node.tag };
+  const w = node.layout && node.layout.width;
+  const h = node.layout && node.layout.height;
+  if (w != null || h != null) o.size = [w != null ? w : null, h != null ? h : null];
+  if (node.text) o.text = node.text.length > 40 ? node.text.slice(0, 40) + "…" : node.text;
+  if (node.isComponent) o.isComponent = true;
+  if (node.instanceOf) o.instanceOf = node.instanceOf;
+  if (node.children && node.children.length) {
+    o.childrenCount = node.children.length;
+    if (depth < maxDepth) o.children = node.children.map((c) => toOutline(c, maxDepth, depth + 1));
+  }
+  return o;
+}
+
 // ---------- tool implementations ----------
 
 const TOOLS = {
   figma_get_file: {
     description:
-      "Pull a whole Figma file as clean, code-ready JSON: normalized layout (flex/gap/padding), fills, typography, effects, components, plus design tokens (variables + styles). Results are cached; pass refresh=true to force a re-pull after the design changed.",
+      "Pull an ENTIRE Figma file once and cache the full normalized data locally (layout, fills, typography, effects, components, tokens). Returns a compact response — file info, design tokens, and a shallow outline (skeleton) — NOT the full tree, so it never overflows. After this, use figma_get_node / figma_outline to read any part from the local cache with no further API calls.",
     inputSchema: {
       type: "object",
       properties: {
         file: { type: "string", description: "Figma file URL or file key." },
-        depth: {
-          type: "number",
-          description: "Optional max tree depth (smaller = lighter payload for huge files).",
-        },
-        include: {
-          type: "array",
-          items: { type: "string", enum: ["document", "tokens", "styles", "variables"] },
-          description: "Which sections to return. Default: document + tokens.",
-        },
-        refresh: { type: "boolean", description: "Ignore cache and re-pull from Figma." },
+        refresh: { type: "boolean", description: "Ignore cache and re-pull from Figma (after a design change)." },
+        outlineDepth: { type: "number", description: "Depth of the skeleton outline returned inline. Default 3." },
         saveToFolder: {
           type: "boolean",
-          description: "Also write the JSON into the project (path from folderPath).",
+          description: "Also write the full JSON into the project (path from folderPath).",
         },
-        folderPath: { type: "string", description: "Directory to write the JSON into when saveToFolder is true." },
+        folderPath: { type: "string", description: "Directory to write the full JSON into when saveToFolder is true." },
       },
       required: ["file"],
     },
     async run(args) {
       const bundle = await buildFileBundle(args.file, {
-        depth: args.depth,
         refresh: args.refresh,
-        include: args.include,
+        include: ["document", "tokens"],
       });
-      let savedPath = null;
+      const { fileKey } = api.parseFileRef(args.file);
+      const cachePath = cache.fileFor(fileKey, "bundle.json");
+      let folderPath = null;
       if (args.saveToFolder) {
         const dir = args.folderPath || process.cwd();
         fs.mkdirSync(dir, { recursive: true });
-        savedPath = path.join(dir, `figma-${bundle.file.key}.json`);
-        fs.writeFileSync(savedPath, JSON.stringify(bundle, null, 2));
+        folderPath = path.join(dir, `figma-${fileKey}.json`);
+        fs.writeFileSync(folderPath, JSON.stringify(bundle, null, 2));
       }
+      const pages = bundle.document || [];
+      const outlineDepth = args.outlineDepth != null ? args.outlineDepth : 3;
       return {
-        summary: {
-          file: bundle.file,
-          cache: bundle._cache,
-          savedToFolder: savedPath,
-          cachedAt: cache.cacheRoot(),
-        },
-        bundle,
+        file: bundle.file,
+        cache: bundle._cache,
+        savedTo: { cache: cachePath, folder: folderPath },
+        tokens: bundle.tokens,
+        outline: pages.map((p) => toOutline(p, outlineDepth)),
+        next:
+          "Full data is cached locally. Call figma_get_node (reads the cache) for any node in full, or figma_outline for a deeper skeleton — no more API calls.",
       };
     },
   },
 
   figma_get_node: {
     description:
-      "Pull one or more specific nodes/frames from a Figma file as normalized, code-ready JSON. Use this iteratively while coding a screen — cheaper than the whole file.",
+      "Read one or more nodes/frames IN FULL detail from the locally cached file (normalized layout, fills, typography, effects, components). Reads from the local cache — the whole file is pulled & cached once automatically if not present. Pass depth to cap how deep the subtree goes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -145,18 +189,47 @@ const TOOLS = {
           items: { type: "string" },
           description: "Node IDs (e.g. '123:45'). A node-id from a URL also works.",
         },
-        depth: { type: "number", description: "Optional max tree depth." },
+        depth: { type: "number", description: "Max subtree depth to return (children beyond it become a count). Default: full." },
+        refresh: { type: "boolean", description: "Re-pull the file from Figma before reading." },
       },
       required: ["file", "nodeIds"],
     },
     async run(args) {
-      const { fileKey } = api.parseFileRef(args.file);
-      const data = await api.getNodes(fileKey, args.nodeIds);
-      const styleSink = {};
-      const nodes = Object.values(data.nodes || {})
-        .filter(Boolean)
-        .map((n) => norm.normalizeNode(n.document, { styleSink, maxDepth: args.depth || Infinity }));
-      return { file: { key: fileKey }, nodes };
+      const { bundle } = await ensureBundle(args.file, { refresh: args.refresh });
+      const pages = bundle.document || [];
+      const maxDepth = args.depth != null ? args.depth : Infinity;
+      const nodes = (args.nodeIds || []).map((raw) => {
+        const id = api.normalizeNodeId(raw);
+        const found = findNodeById(pages, id) || findNodeById(pages, raw);
+        return found ? pruneDepth(found, maxDepth) : { id: raw, error: "not found in file" };
+      });
+      return { file: bundle.file, source: "local-cache", nodes };
+    },
+  },
+
+  figma_outline: {
+    description:
+      "Return a compact skeleton (id / name / type / tag / size, nested) of the file or a node — no styles. Reads the local cache (pulling the file once if needed). Use it to navigate a large design and pick node ids to read in full with figma_get_node.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "Figma file URL or file key." },
+        nodeId: { type: "string", description: "Root node for the outline. Omit for the whole file." },
+        depth: { type: "number", description: "How deep the skeleton goes. Default 4." },
+        refresh: { type: "boolean", description: "Re-pull the file from Figma before reading." },
+      },
+      required: ["file"],
+    },
+    async run(args) {
+      const { bundle } = await ensureBundle(args.file, { refresh: args.refresh });
+      const pages = bundle.document || [];
+      const depth = args.depth != null ? args.depth : 4;
+      let roots = pages;
+      if (args.nodeId) {
+        const n = findNodeById(pages, api.normalizeNodeId(args.nodeId)) || findNodeById(pages, args.nodeId);
+        roots = n ? [n] : [];
+      }
+      return { file: bundle.file, source: "local-cache", outline: roots.map((r) => toOutline(r, depth)) };
     },
   },
 
